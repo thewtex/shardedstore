@@ -2,9 +2,10 @@
 
 __version__ = "0.1.0"
 
-import zarr.storage
-
 from typing import Dict, Optional
+from pathlib import Path
+
+import zarr.storage
 
 class ShardedStore(zarr.storage.Store):
     """Store composed of a base store and additional component stores."""
@@ -13,10 +14,20 @@ class ShardedStore(zarr.storage.Store):
         """Created the shared store. Paths for the shard stores are "mounted" on the base store."""
         self.base = base
         if shards is None:
-            shards = {}
+            self.shards = {}
         self.shards = shards
 
-        self._mount_points = list(shards.keys())
+        self._mount_points = [Path(s) for s in shards.keys()]
+        def check_overlapping(mount_points, index):
+            mp = mount_points[index]
+            for ii, mount_point in enumerate(mount_points):
+                if ii != index:
+                    if mp in mount_point.parents:
+                        raise RuntimeError(f'{mp} is a subgroup of {mount_point} -- not supported')
+            if index+1 < len(mount_points):
+                check_overlapping(mount_points, index+1)
+        if len(self._mount_points):
+            check_overlapping(self._mount_points, 0)
 
     def is_readable(self):
         return all([self.base.is_readable(),] + list(map(lambda x: x.is_readable(), self.shards.values())))

@@ -7,7 +7,7 @@ from shardedstore import ShardedStore
 
 from zarr.storage import DirectoryStore, ZipStore
 
-def test_datatree_sharedstore():
+def test_datatree_shardedstore():
 
     # xarray-datatree Quick Overview
     data = xr.DataArray(np.random.randn(3, 3, 5), dims=("x", "y", "z"), coords={"x": [4, 10, 20]})
@@ -26,6 +26,13 @@ def test_datatree_sharedstore():
     base_store = DirectoryStore("/tmp/base.zarr", dimension_separator='/')
     shard1 = DirectoryStore("/tmp/shard1.zarr", dimension_separator='/')
     shard2 = DirectoryStore("/tmp/shard2.zarr", dimension_separator='/')
+
+    try:
+        sharded_store = ShardedStore(base_store, {'simulation': shard1, 'simulation/fine': shard2})
+        assert False
+    except RuntimeError as e:
+        # shards must not be overlapping
+        pass
 
     sharded_store = ShardedStore(base_store, {'people': shard1, 'simulation/fine': shard2})
 
