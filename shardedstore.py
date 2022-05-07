@@ -30,6 +30,11 @@ class ShardedStore(zarr.storage.Store):
     def is_erasable(self):
         return all([self.base.is_erasable(),] + list(map(lambda x: x.is_erasable(), self.shards.values())))
 
+    def close(self):
+        for shard in self.shards.values():
+            shard.close()
+        self.base.close()
+
     def __delitem__(self, key):
         # todo
         pass

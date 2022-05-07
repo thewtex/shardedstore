@@ -34,6 +34,8 @@ def test_datatree_sharedstore():
     assert sharded_store.is_listable()
     assert sharded_store.is_erasable()
 
+    sharded_store.close()
+
     # with tempfile.TemporaryDirectory() as folder:
     #     carfilename = os.path.join(folder, basename + ".car")
     #     indexfilename = os.path.join(folder, basename + ".json")
