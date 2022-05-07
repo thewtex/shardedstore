@@ -21,4 +21,5 @@ dependencies = [
 test = [
     "pytest >=2.7.3",
     "xarray-datatree >=0.0.5",
+    "scipy",
 ]
