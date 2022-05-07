@@ -41,6 +41,24 @@ def test_datatree_shardedstore():
     assert sharded_store.is_listable()
     assert sharded_store.is_erasable()
 
+    assert sharded_store._shard_for_key('test')[0] == base_store
+    assert sharded_store._shard_for_key('test')[1] == 'test'
+
+    assert sharded_store._shard_for_key('t/e')[0] == base_store
+    assert sharded_store._shard_for_key('t/e')[1] == 't/e'
+
+    assert sharded_store._shard_for_key('people/bob')[0] == shard1
+    assert sharded_store._shard_for_key('people/bob')[1] == 'bob'
+
+    assert sharded_store._shard_for_key('simpulation')[0] == base_store
+    assert sharded_store._shard_for_key('simulation')[1] == 'simulation'
+
+    assert sharded_store._shard_for_key('simulation/fine')[0] == base_store
+    assert sharded_store._shard_for_key('simulation/fine')[1] == 'simulation/fine'
+
+    assert sharded_store._shard_for_key('simulation/fine/.zarray')[0] == shard2
+    assert sharded_store._shard_for_key('simulation/fine/.zarray')[1] == '.zarray'
+
     sharded_store.close()
 
     # with tempfile.TemporaryDirectory() as folder:
