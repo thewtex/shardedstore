@@ -64,12 +64,12 @@ class ShardedStore(zarr.storage.Store):
         pass
 
     def __getitem__(self, key):
-        # todo
-        pass
+        shard, new_key = self._shard_for_key(key)
+        return shard[new_key]
 
     def __setitem__(self, key, value):
-        # todo
-        pass
+        shard, new_key = self._shard_for_key(key)
+        shard[new_key] = value
 
     def __iter__(self):
         # todo

@@ -50,7 +50,7 @@ def test_datatree_shardedstore():
     assert sharded_store._shard_for_key('people/bob')[0] == shard1
     assert sharded_store._shard_for_key('people/bob')[1] == 'bob'
 
-    assert sharded_store._shard_for_key('simpulation')[0] == base_store
+    assert sharded_store._shard_for_key('simulation')[0] == base_store
     assert sharded_store._shard_for_key('simulation')[1] == 'simulation'
 
     assert sharded_store._shard_for_key('simulation/fine')[0] == base_store
@@ -59,6 +59,18 @@ def test_datatree_shardedstore():
     assert sharded_store._shard_for_key('simulation/fine/.zarray')[0] == shard2
     assert sharded_store._shard_for_key('simulation/fine/.zarray')[1] == '.zarray'
 
+
+    base_content = 'base_content'.encode()
+    sharded_store['base'] = base_content
+    assert sharded_store['base'] == base_content
+
+    shard1_content = 'shard1_content'.encode()
+    sharded_store['people/shard1'] = shard1_content
+    assert sharded_store['people/shard1'] == shard1_content
+
+    shard2_content = 'shard2_content'.encode()
+    sharded_store['simulation/fine/shard2'] = shard2_content
+    assert sharded_store['simulation/fine/shard2'] == shard2_content
     sharded_store.close()
 
     # with tempfile.TemporaryDirectory() as folder:
