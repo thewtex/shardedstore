@@ -4,6 +4,7 @@ __version__ = "0.1.0"
 
 from typing import Dict, Optional, Tuple
 from pathlib import PurePosixPath
+import itertools
 
 import zarr.storage
 from zarr.util import normalize_storage_path
@@ -22,10 +23,9 @@ class ShardedStore(zarr.storage.Store):
                 self.shards[norm] = s
                 self._mount_points.append(PurePosixPath(p))
 
-        for ia, mpa in enumerate(self._mount_points):
-            for ib, mpb in enumerate(self._mount_points):
-                if ia != ib and mpa in mpb.parents:
-                        raise RuntimeError(f'{mpb} is a subgroup of {mpa} -- not supported')
+        for mpa, mpb in itertools.permutations(self._mount_points, 2):
+                if  mpa in mpb.parents:
+                    raise RuntimeError(f'{mpb} is a subgroup of {mpa} -- not supported')
 
         mount_point_lengths = [len(str(mp)) for mp in self._mount_points]
         self._min_mount_point_length = min(mount_point_lengths)
@@ -60,8 +60,8 @@ class ShardedStore(zarr.storage.Store):
         self.base.close()
 
     def __delitem__(self, key):
-        # todo
-        pass
+        shard, new_key = self._shard_for_key(key)
+        del shard[new_key]
 
     def __getitem__(self, key):
         shard, new_key = self._shard_for_key(key)
@@ -71,10 +71,14 @@ class ShardedStore(zarr.storage.Store):
         shard, new_key = self._shard_for_key(key)
         shard[new_key] = value
 
+    @staticmethod
+    def _shard_iter(shards):
+        for mount, shard in shards.items():
+            for k in iter(shard):
+                yield mount + '/' + k
+
     def __iter__(self):
-        # todo
-        pass
+        return itertools.chain(self.base, self._shard_iter(self.shards))
 
     def __len__(self):
-        # todo
-        pass
+        return sum([len(self.base),] + [len(s) for s in self.shards.values()])

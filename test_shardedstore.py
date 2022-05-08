@@ -1,3 +1,4 @@
+from cmath import exp
 import tempfile
 import numpy as np
 import xarray as xr
@@ -71,6 +72,19 @@ def test_datatree_shardedstore():
     shard2_content = 'shard2_content'.encode()
     sharded_store['simulation/fine/shard2'] = shard2_content
     assert sharded_store['simulation/fine/shard2'] == shard2_content
+
+    assert len(sharded_store) == 3
+    expected = ['base', 'people/shard1', 'simulation/fine/shard2']
+    for i, k in enumerate(sharded_store):
+        assert expected[i] == k
+
+    del sharded_store['base']
+    del sharded_store['people/shard1']
+    assert len(sharded_store) == 1
+    expected = ['simulation/fine/shard2']
+    for i, k in enumerate(sharded_store):
+        assert expected[i] == k
+
     sharded_store.close()
 
     # with tempfile.TemporaryDirectory() as folder:
