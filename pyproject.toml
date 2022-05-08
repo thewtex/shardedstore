@@ -10,12 +10,12 @@ classifiers = ["License :: OSI Approved :: Apache Software License"]
 dynamic = ["version", "description"]
 requires-python = ">=3.8"
 
-[project.urls]
-Home = "https://github.com/thewtex/sharedstore"
-
 dependencies = [
     "zarr >=2.11.3",
 ]
+
+[project.urls]
+Home = "https://github.com/thewtex/sharedstore"
 
 [project.optional-dependencies]
 test = [
