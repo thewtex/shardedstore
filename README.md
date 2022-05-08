@@ -1,6 +1,7 @@
 # shardedstore
 
 [![image](https://img.shields.io/pypi/v/shardedstore.svg)](https://pypi.python.org/pypi/shardedstore/)
+[![DOI](https://zenodo.org/badge/489549406.svg)](https://zenodo.org/badge/latestdoi/489549406)
 
 Provides a sharded Zarr store.
 
