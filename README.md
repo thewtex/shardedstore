@@ -1,11 +1,14 @@
-# sharedstore
+# shardedstore
+
+[![image](https://img.shields.io/pypi/v/shardedstore.svg)](https://pypi.python.org/pypi/shardedstore/)
+[![DOI](https://zenodo.org/badge/489549406.svg)](https://zenodo.org/badge/latestdoi/489549406)
 
 Provides a sharded Zarr store.
 
 ## Installation
 
 ```sh
-pip install sharedstore
+pip install shardedstore
 ```
 
 ## Development
@@ -13,7 +16,7 @@ pip install sharedstore
 Contributions are welcome and appreciated.
 
 ```
-git clone https://github.com/thewtex/sharedstore
+git clone https://github.com/thewtex/shardedstore
 cd shardedstore
 pip install -e ".[test]"
 pytest
