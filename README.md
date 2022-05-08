@@ -1,11 +1,11 @@
-# sharedstore
+# shardedstore
 
 Provides a sharded Zarr store.
 
 ## Installation
 
 ```sh
-pip install sharedstore
+pip install shardedstore
 ```
 
 ## Development
@@ -13,7 +13,7 @@ pip install sharedstore
 Contributions are welcome and appreciated.
 
 ```
-git clone https://github.com/thewtex/sharedstore
+git clone https://github.com/thewtex/shardedstore
 cd shardedstore
 pip install -e ".[test]"
 pytest
