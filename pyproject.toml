@@ -19,6 +19,7 @@ Home = "https://github.com/thewtex/sharedstore"
 
 [project.optional-dependencies]
 test = [
+    "dask",
     "pytest >=2.7.3",
     "xarray-datatree >=0.0.5",
     "scipy",
