@@ -16,29 +16,42 @@ class ShardedStore(zarr.storage.Store):
         """Created the shared store. Paths for the shard stores are "mounted" on the base store."""
         self.base = base
         self.shards = {}
-        self._mount_points = []
+        self._mount_paths = []
+        mount_paths = []
         if shards:
             for p, s in shards.items():
                 norm = normalize_storage_path(p)
                 self.shards[norm] = s
-                self._mount_points.append(PurePosixPath(p))
+                self._mount_paths.append(norm)
+                mount_paths.append(PurePosixPath(norm))
 
-        for mpa, mpb in itertools.permutations(self._mount_points, 2):
+        for mpa, mpb in itertools.permutations(mount_paths, 2):
                 if  mpa in mpb.parents:
                     raise RuntimeError(f'{mpb} is a subgroup of {mpa} -- not supported')
 
-        mount_point_lengths = [len(str(mp)) for mp in self._mount_points]
-        self._min_mount_point_length = min(mount_point_lengths)
+        mount_path_lengths = [len(str(mp)) for mp in self._mount_paths]
+        self._mount_path_lengths = set(mount_path_lengths)
+        self._mount_paths_per_length = {}
+        for mount_path in self._mount_paths:
+            length = len(mount_path)
+            mount_paths = self._mount_paths_per_length.get(length, [])
+            mount_paths.append(mount_path)
+            self._mount_paths_per_length[length] = mount_paths
+        self._min_mount_path_length = min(mount_path_lengths)
 
     def _shard_for_key(self, key: str) -> Tuple[zarr.storage.BaseStore, str]:
         norm_key = normalize_storage_path(key)
-        if len(norm_key) <= self._min_mount_point_length:
+        if len(norm_key) <= self._min_mount_path_length:
             return self.base, norm_key
-        path = PurePosixPath(norm_key)
-        parents = path.parents
-        for mp in self._mount_points:
-            if mp in parents:
-                return self.shards[str(mp)], str(path.relative_to(mp))
+        norm_key_length = len(norm_key)
+        for mount_path_length in self._mount_path_lengths:
+            if norm_key_length <= mount_path_length + 1:
+                continue
+            norm_key_prefix = norm_key[:mount_path_length]
+            mount_paths = self._mount_paths_per_length[mount_path_length]
+            for mount_path in mount_paths:
+                if norm_key_prefix == mount_path:
+                    return self.shards[mount_path], str(PurePosixPath(norm_key).relative_to(PurePosixPath(mount_path)))
         return self.base, norm_key
         
  
