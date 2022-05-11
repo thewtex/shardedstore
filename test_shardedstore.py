@@ -6,18 +6,26 @@ import xarray as xr
 from datatree import DataTree
 import datatree
 
-from shardedstore import ShardedStore
+from shardedstore import ShardedStore, array_shard_directory_store, array_shard_zip_store
 
-from zarr.storage import DirectoryStore, ZipStore
+from zarr.storage import DirectoryStore
 
 def test_shardedstore():
     with tempfile.TemporaryDirectory(prefix='test_shardedstore') as folder:
         base_store = DirectoryStore(os.path.join(folder, "base.zarr"), dimension_separator='/')
         shard1 = DirectoryStore(os.path.join(folder, "shard1.zarr"), dimension_separator='/')
         shard2 = DirectoryStore(os.path.join(folder, "shard2.zarr"), dimension_separator='/')
+        array_shards1 = array_shard_directory_store("array_shard1")
+        array_shards2 = array_shard_zip_store("array_shard2")
 
         try:
             sharded_store = ShardedStore(base_store, {'simulation': shard1, 'simulation/fine': shard2})
+            assert False
+        except RuntimeError as e:
+            # shards must not be overlapping
+            pass
+        try:
+            sharded_store = ShardedStore(base_store, {'simulation': shard1}, {'simulation/fine': (2, array_shards1)})
             assert False
         except RuntimeError as e:
             # shards must not be overlapping
@@ -45,8 +53,8 @@ def test_shardedstore():
         assert sharded_store._shard_for_key('simulation/fine')[0] == base_store
         assert sharded_store._shard_for_key('simulation/fine')[1] == 'simulation/fine'
 
-        assert sharded_store._shard_for_key('simulation/fine/.zarray')[0] == shard2
-        assert sharded_store._shard_for_key('simulation/fine/.zarray')[1] == '.zarray'
+        assert sharded_store._shard_for_key('simulation/fine/line')[0] == shard2
+        assert sharded_store._shard_for_key('simulation/fine/line')[1] == 'line'
 
 
         base_content = 'base_content'.encode()
@@ -76,10 +84,13 @@ def test_shardedstore():
         sharded_store.close()
 
 def test_datatree_shardedstore():
-    with tempfile.TemporaryDirectory(prefix='test_datatree_shardedstore') as folder:
+    # with tempfile.TemporaryDirectory(prefix='test_datatree_shardedstore') as folder:
+        folder = "/tmp/"
         base_store = DirectoryStore(os.path.join(folder, "base.zarr"), dimension_separator='/')
         shard1 = DirectoryStore(os.path.join(folder, "shard1.zarr"), dimension_separator='/')
         shard2 = DirectoryStore(os.path.join("shard2.zarr"), dimension_separator='/')
+        array_shards1 = array_shard_directory_store("array_shards1")
+        array_shards2 = array_shard_zip_store("array_shards2")
 
         # xarray-datatree Quick Overview
         data = xr.DataArray(np.random.randn(3, 3, 5), dims=("x", "y", "z"), coords={"x": [4, 10, 20]})
@@ -95,7 +106,9 @@ def test_datatree_shardedstore():
         single_store = DirectoryStore(os.path.join(folder, "single.zarr"), dimension_separator='/')
         dt.to_zarr(single_store)
         
-        sharded_store = ShardedStore(base_store, {'people': shard1, 'simulation/fine': shard2})
+        sharded_store = ShardedStore(base_store,
+            {'people': shard1, 'species': shard2},
+            {'simulation/coarse/foo': (1, array_shards1), 'simulation/fine/foo': (2, array_shards2)})
         dt.to_zarr(sharded_store)
 
         from_single = datatree.open_datatree(single_store, engine='zarr')
