@@ -203,7 +203,7 @@ class ShardedStore(zarr.storage.Store):
 
     @classmethod
     def from_config(cls, config):
-        """Instantiate a read-only sharded store from its `get_config` configuration."""
+        """Instantiate a sharded store from its `get_config` configuration."""
 
         if config['name'] != cls.__name__:
             raise ValueError(f'Config provided is not for {cls.__name__}')
@@ -275,8 +275,11 @@ class ShardedStore(zarr.storage.Store):
                             array_meta.pop('zarr_format', None)
                             array_meta['compressor'] = codecs.registry.get_codec(array_meta['compressor'])
 
+                            prefix_separator = self._dimension_separator
+                            if not prefix_separator:
+                                prefix_separator = '/'
                             for chunk_shard in itertools.product(*(range(s) for s in chunk_shard_shape)):
-                                chunk_prefix = '/'.join([str(c) for c in chunk_shard])
+                                chunk_prefix = prefix_separator.join([str(c) for c in chunk_shard])
                                 array_shard = array_shard_func(chunk_prefix)
                                 if hasattr(array_shard, '_dimension_separator'):
                                     if array_shard._dimension_separator != self._dimension_separator:
