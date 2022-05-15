@@ -118,7 +118,8 @@ class ShardedStore(zarr.storage.Store):
             mount_paths = self._mount_paths_per_length.get(length, set())
             mount_paths.add(mount_path)
             self._mount_paths_per_length[length] = mount_paths
-        self._min_mount_path_length = min(mount_path_lengths)
+        if len(mount_path_lengths):
+            self._min_mount_path_length = min(mount_path_lengths)
 
     def _shard_for_key(self, key: str, value: bytes = None) -> Tuple[zarr.storage.BaseStore, str]:
         norm_key = normalize_storage_path(key)
