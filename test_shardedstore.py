@@ -97,7 +97,8 @@ def test_datatree_shardedstore(dimension_separator):
         shard1 = DirectoryStore(os.path.join(folder, "shard1.zarr"), dimension_separator=dimension_separator)
         shard2 = DirectoryStore(os.path.join(folder, "shard2.zarr"), dimension_separator=dimension_separator)
         array_shards1 = array_shard_directory_store(os.path.join(folder, "array_shards1"), dimension_separator=dimension_separator)
-        array_shards2 = array_shard_zip_store(os.path.join(folder, "array_shards2"), dimension_separator=dimension_separator)
+        # array_shards2 = array_shard_zip_store(os.path.join(folder, "array_shards2"), dimension_separator=dimension_separator)
+        array_shards2 = array_shard_directory_store(os.path.join(folder, "array_shards2"), dimension_separator=dimension_separator)
 
         # xarray-datatree Quick Overview
         data = xr.DataArray(np.random.randn(3, 3, 5), dims=("x", "y", "z"), coords={"x": [4, 10, 20]})
@@ -123,3 +124,5 @@ def test_datatree_shardedstore(dimension_separator):
         from_sharded = datatree.open_datatree(sharded_store, engine='zarr').compute()
 
         assert from_single.identical(from_sharded)
+        # Close zip stores before removing
+        sharded_store.close()

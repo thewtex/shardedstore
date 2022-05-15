@@ -199,6 +199,9 @@ class ShardedStore(zarr.storage.Store):
     def close(self):
         for shard in self.shards.values():
             shard.close()
+        for array_shards in self.array_shards.values():
+            for array_shard in array_shards.values():
+                array_shard.close()
         self.base.close()
 
     def __delitem__(self, key):
