@@ -1,6 +1,6 @@
 """Provides a sharded Zarr store."""
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 from typing import Any, Dict, Optional, Tuple, Callable
 from pathlib import PurePosixPath, Path
@@ -8,6 +8,7 @@ import itertools
 import functools
 import json
 import math
+import importlib
 
 import numcodecs as codecs
 from numpy import array
@@ -40,6 +41,34 @@ def array_shard_zip_store(prefix: str, **kwargs):
 
 class ShardedStore(zarr.storage.Store):
     """Store composed of a base store and additional component stores."""
+
+    def _update_internal_state(self):
+        self._mount_paths = []
+        self._array_mount_paths = []
+
+        mount_paths = []
+        for shard_path in self.shards:
+            self._mount_paths.append(shard_path)
+            mount_paths.append(PurePosixPath(shard_path))
+        array_mount_paths = []
+        for shard_path in self.array_shards:
+            self._array_mount_paths.append(shard_path)
+            array_mount_paths.append(PurePosixPath(shard_path))
+
+        for mpa, mpb in itertools.permutations(mount_paths + array_mount_paths, 2):
+                if  mpa in mpb.parents:
+                    raise RuntimeError(f'{mpb} is a subgroup of {mpa} -- not supported')
+
+        mount_path_lengths = [len(str(mp)) for mp in self._mount_paths + self._array_mount_paths]
+        self._mount_path_lengths = set(mount_path_lengths)
+        self._mount_paths_per_length = {}
+        for mount_path in self._mount_paths + self._array_mount_paths:
+            length = len(mount_path)
+            mount_paths = self._mount_paths_per_length.get(length, set())
+            mount_paths.add(mount_path)
+            self._mount_paths_per_length[length] = mount_paths
+        if len(mount_path_lengths):
+            self._min_mount_path_length = min(mount_path_lengths)
 
     def __init__(self,
          base: zarr.storage.BaseStore,
@@ -86,40 +115,135 @@ class ShardedStore(zarr.storage.Store):
             if base._dimension_separator != dimension_separator:
                 raise ValueError('ShardedStore and base store must use the same dimension_separator')
 
-        self._mount_paths = []
-        self._array_mount_paths = []
-
-        mount_paths = []
         if shards:
             for p, s in shards.items():
                 norm = normalize_storage_path(p)
                 self.shards[norm] = s
-                self._mount_paths.append(norm)
-                mount_paths.append(PurePosixPath(norm))
-        array_mount_paths = []
+
         if array_shard_funcs:
             for p, s in array_shard_funcs.items():
                 norm = normalize_storage_path(p)
                 self.array_shard_dims[norm] = s[0]
                 self.array_shard_funcs[norm] = s[1]
                 self.array_shards[norm] = {}
-                self._array_mount_paths.append(norm)
-                array_mount_paths.append(PurePosixPath(norm))
 
-        for mpa, mpb in itertools.permutations(mount_paths + array_mount_paths, 2):
-                if  mpa in mpb.parents:
-                    raise RuntimeError(f'{mpb} is a subgroup of {mpa} -- not supported')
+        self._update_internal_state()
 
-        mount_path_lengths = [len(str(mp)) for mp in self._mount_paths + self._array_mount_paths]
-        self._mount_path_lengths = set(mount_path_lengths)
-        self._mount_paths_per_length = {}
-        for mount_path in self._mount_paths + self._array_mount_paths:
-            length = len(mount_path)
-            mount_paths = self._mount_paths_per_length.get(length, set())
-            mount_paths.add(mount_path)
-            self._mount_paths_per_length[length] = mount_paths
-        if len(mount_path_lengths):
-            self._min_mount_path_length = min(mount_path_lengths)
+    @staticmethod
+    def _get_store_config(store):
+        if hasattr(store, 'get_config'):
+            return store.get_config()
+
+        store_name = store.__class__.__name__
+        store_module = store.__module__
+        store_package = store_module.split('.')[0]
+        store_package = importlib.import_module(store_package)
+
+        config_args = []
+        config_kwargs = {}
+        for k in store.__dict__:
+            if k == '_dimension_separator':
+                config_kwargs['dimension_separator'] = store._dimension_separator
+            elif k in ('path', 'base'):
+                config_args.append(getattr(store, k))
+            elif not k.startswith('_'):
+                val = getattr(store, k)
+                try:
+                    json_serializable = json.dumps(val)
+                    config_kwargs[k] = val
+                except (TypeError, OverflowError):
+                    pass
+        config = {
+            'args': config_args,
+            'kwargs': config_kwargs,
+        }
+        storeconfig = {
+            'name': store_name,
+            'module': store_module,
+            'config': config,
+        }
+        if hasattr(store_package, '__version__'):
+            storeconfig['version'] = store_package.__version__
+
+        return storeconfig
+
+    def get_config(self):
+        """Returns a dictionary with configuration parameters for the store and store shards.
+        Can be used with `from_config` to create a read-only instance of the store.
+        All values compatible with JSON encoding."""
+
+        shard_config = {}
+        for shard_path in self.shards:
+            shard_config[shard_path] = self._get_store_config(self.shards[shard_path])
+
+        array_shard_dims_config = {}
+        for shard_path in self.array_shard_dims:
+            array_shard_dims_config[shard_path] = self.array_shard_dims[shard_path]
+
+        array_shards_config = {}
+        for array_shards_path in self.array_shards:
+            array_shard_config = {}
+            for array_shard_path in self.array_shards[array_shards_path]:
+                array_shard_config[array_shard_path] = self._get_store_config(self.array_shards[array_shards_path][array_shard_path])
+            array_shards_config[array_shards_path] = array_shard_config
+
+        config = {
+            'args': [self._get_store_config(self.base),],
+            'kwargs': {'dimension_separator': self._dimension_separator,
+            'shards': shard_config,
+            'array_shard_dims': array_shard_dims_config,
+            'array_shards': array_shards_config,
+            }
+        }
+        storeconfig = {
+            'version': __version__,
+            'name': self.__class__.__name__,
+            'module': self.__module__,
+            'config': config
+        }
+
+        return storeconfig
+
+    @staticmethod
+    def _from_store_config(config):
+        mod = importlib.import_module(config['module'])
+        store_cls = getattr(mod, config['name'])
+        if hasattr(store_cls, 'from_config'):
+            return store_cls.from_config(config)
+        return store_cls(*config['config']['args'], **config['config']['kwargs'])
+
+    @classmethod
+    def from_config(cls, config):
+        """Instantiate a read-only sharded store from its `get_config` configuration."""
+
+        if config['name'] != cls.__name__:
+            raise ValueError(f'Config provided is not for {cls.__name__}')
+
+        config = config['config']
+        base = cls._from_store_config(config['args'][0])
+        shards = {}
+        if 'shards' in config['kwargs']:
+            for shard_path in config['kwargs']['shards']:
+                shards[shard_path] = cls._from_store_config(config['kwargs']['shards'][shard_path])
+
+        sharded_store = cls(base, shards=shards)
+
+        array_shards = {}
+        array_shard_dims = {}
+        if 'array_shards' in config['kwargs']:
+            array_shards_config = config['kwargs']['array_shards']
+            for array_shards_path in array_shards_config:
+                array_shards[array_shards_path] = {}
+                array_shard_config = array_shards_config[array_shards_path]
+                for array_shard_path in array_shard_config:
+                    array_shard_dims[array_shards_path] = (len(array_shard_path) + 1) // 2
+                    array_shard = cls._from_store_config(array_shard_config[array_shard_path])
+                    array_shards[array_shards_path][array_shard_path] = array_shard
+        sharded_store.array_shards = array_shards
+        sharded_store.array_shard_dims = array_shard_dims
+        sharded_store._update_internal_state()
+
+        return sharded_store
 
     def _shard_for_key(self, key: str, value: bytes = None) -> Tuple[zarr.storage.BaseStore, str]:
         norm_key = normalize_storage_path(key)
@@ -188,7 +312,7 @@ class ShardedStore(zarr.storage.Store):
         shards_status = list(map(lambda x: getattr(x, status_method)(), self.shards.values()))
         array_shards_status = []
         for array_shards in self.array_shards.values():
-            for array_shard in self.array_shards.values():
+            for array_shard in array_shards:
                 status = list(map(lambda x: getattr(x, status_method)(), array_shard.values()))
                 array_shards_status = array_shards_status + status
         return all(base_status + shards_status + array_shards_status)

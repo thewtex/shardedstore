@@ -7,6 +7,7 @@ import numpy as np
 import xarray as xr
 from datatree import DataTree
 import datatree
+import json
 
 from shardedstore import ShardedStore, array_shard_directory_store, array_shard_zip_store
 
@@ -88,6 +89,11 @@ def test_shardedstore():
         for i, k in enumerate(sharded_store):
             assert expected[i] == k
 
+        config = sharded_store.get_config()
+        config_str = json.dumps(config)
+        config = json.loads(config_str)
+        sharded_store = ShardedStore.from_config(config)
+
         sharded_store.close()
 
 @pytest.mark.parametrize("dimension_separator", ['/', '.', None])
@@ -120,9 +126,15 @@ def test_datatree_shardedstore(dimension_separator):
             {'simulation/coarse/foo': (1, array_shards1), 'simulation/fine/foo': (2, array_shards2)})
         dt.to_zarr(sharded_store)
 
+
+        config = sharded_store.get_config()
+        config_str = json.dumps(config)
+        config = json.loads(config_str)
+        sharded_store = ShardedStore.from_config(config)
+
         from_single = datatree.open_datatree(single_store, engine='zarr').compute()
         from_sharded = datatree.open_datatree(sharded_store, engine='zarr').compute()
 
         assert from_single.identical(from_sharded)
-        # Close zip stores before removing
+
         sharded_store.close()
