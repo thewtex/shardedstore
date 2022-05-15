@@ -182,19 +182,28 @@ class ShardedStore(zarr.storage.Store):
                 if norm_key_prefix in self.shards:
                     return self.shards[norm_key_prefix], str(PurePosixPath(norm_key).relative_to(PurePosixPath(norm_key_prefix))) 
         return self.base, norm_key
+    
+    def _get_shards_status(self, status_method):
+        base_status = [getattr(self.base, status_method)(),]
+        shards_status = list(map(lambda x: getattr(x, status_method)(), self.shards.values()))
+        array_shards_status = []
+        for array_shards in self.array_shards.values():
+            for array_shard in self.array_shards.values():
+                status = list(map(lambda x: getattr(x, status_method)(), array_shard.values()))
+                array_shards_status = array_shards_status + status
+        return all(base_status + shards_status + array_shards_status)
         
- 
     def is_readable(self):
-        return all([self.base.is_readable(),] + list(map(lambda x: x.is_readable(), self.shards.values())))
+        return self._get_shards_status('is_readable')
 
     def is_writeable(self):
-        return all([self.base.is_writeable(),] + list(map(lambda x: x.is_writeable(), self.shards.values())))
+        return self._get_shards_status('is_writeable')
 
     def is_listable(self):
-        return all([self.base.is_listable(),] + list(map(lambda x: x.is_listable(), self.shards.values())))
+        return self._get_shards_status('is_listable')
 
     def is_erasable(self):
-        return all([self.base.is_erasable(),] + list(map(lambda x: x.is_erasable(), self.shards.values())))
+        return self._get_shards_status('is_erasable')
 
     def close(self):
         for shard in self.shards.values():
