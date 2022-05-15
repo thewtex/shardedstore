@@ -28,17 +28,6 @@ def array_shard_directory_store(prefix: str, **kwargs):
 
     return wrapper
 
-def array_shard_zip_store(prefix: str, **kwargs):
-    """Creates a ZipStore based on the provided prefix path when passed a string of chunk dimensions.
-    
-    For use in ShardedStore array_shards."""
-    @functools.wraps(zarr.storage.ZipStore)
-    def wrapper(chunk_dims: str):
-        Path(f'{prefix}/{chunk_dims}').parent.mkdir(parents=True, exist_ok=True)
-        return zarr.storage.ZipStore(f'{prefix}/{chunk_dims}.zarr.zip', **kwargs)
-
-    return wrapper
-
 class ShardedStore(zarr.storage.Store):
     """Store composed of a base store and additional component stores."""
 

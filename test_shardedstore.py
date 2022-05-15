@@ -9,7 +9,7 @@ from datatree import DataTree
 import datatree
 import json
 
-from shardedstore import ShardedStore, array_shard_directory_store, array_shard_zip_store
+from shardedstore import ShardedStore, array_shard_directory_store
 
 from zarr.storage import DirectoryStore
 
@@ -103,7 +103,6 @@ def test_datatree_shardedstore(dimension_separator):
         shard1 = DirectoryStore(os.path.join(folder, "shard1.zarr"), dimension_separator=dimension_separator)
         shard2 = DirectoryStore(os.path.join(folder, "shard2.zarr"), dimension_separator=dimension_separator)
         array_shards1 = array_shard_directory_store(os.path.join(folder, "array_shards1"), dimension_separator=dimension_separator)
-        # array_shards2 = array_shard_zip_store(os.path.join(folder, "array_shards2"), dimension_separator=dimension_separator)
         array_shards2 = array_shard_directory_store(os.path.join(folder, "array_shards2"), dimension_separator=dimension_separator)
 
         # xarray-datatree Quick Overview
