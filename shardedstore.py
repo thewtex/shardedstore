@@ -28,14 +28,31 @@ def array_shard_directory_store(prefix: str, **kwargs):
 
     return wrapper
 
-def array_shard_zip_store(prefix: str, **kwargs):
-    """Creates a ZipStore based on the provided prefix path when passed a string of chunk dimensions.
+def to_zip_store(prefix: str, shard_store: zarr.storage.BaseStore, shard_path: str, chunk_dims: Optional[str]):
+    """Convert stores to a zip store at the provided prefix."""
+    if chunk_dims:
+        store_path = f'{prefix}/{shard_path}/{chunk_dims}.zarr.zip'
+    elif shard_path:
+        store_path = f'{prefix}/{shard_path}.zarr.zip'
+    else:
+        store_path = f'{prefix}.zarr.zip'
+    Path(store_path).parent.mkdir(parents=True, exist_ok=True)
+
+    dimension_separator = getattr(shard_store, '_dimension_separator', None)
+    zip_store = zarr.storage.ZipStore(store_path, mode='a', dimension_separator=dimension_separator)
+    for k in shard_store:
+        zip_store[k] = shard_store[k]
+
+    zip_store.flush()
+    return zip_store
+
+def to_zip_store_with_prefix(prefix: str):
+    """Convert stores to a zip store at the provided prefix.
     
-    For use in ShardedStore array_shards."""
-    @functools.wraps(zarr.storage.ZipStore)
-    def wrapper(chunk_dims: str):
-        Path(f'{prefix}/{chunk_dims}').parent.mkdir(parents=True, exist_ok=True)
-        return zarr.storage.ZipStore(f'{prefix}/{chunk_dims}.zarr.zip', **kwargs)
+    For use in `ShardedStore.map_shards`."""
+    @functools.wraps(to_zip_store)
+    def wrapper(shard_store: zarr.storage.BaseStore, shard_path: str, chunk_dims: Optional[str]):
+        return to_zip_store(prefix, shard_store, shard_path, chunk_dims)
 
     return wrapper
 
@@ -144,6 +161,9 @@ class ShardedStore(zarr.storage.Store):
         for k in store.__dict__:
             if k == '_dimension_separator':
                 config_kwargs['dimension_separator'] = store._dimension_separator
+            # Avoid clobbering on re-open
+            elif k == 'mode' and k in 'wx':
+                pass
             elif k in ('path', 'base'):
                 config_args.append(getattr(store, k))
             elif not k.startswith('_'):
@@ -214,7 +234,7 @@ class ShardedStore(zarr.storage.Store):
 
     @classmethod
     def from_config(cls, config):
-        """Instantiate a read-only sharded store from its `get_config` configuration."""
+        """Instantiate a sharded store from its `get_config` configuration."""
 
         if config['name'] != cls.__name__:
             raise ValueError(f'Config provided is not for {cls.__name__}')
@@ -242,6 +262,34 @@ class ShardedStore(zarr.storage.Store):
         sharded_store.array_shards = array_shards
         sharded_store.array_shard_dims = array_shard_dims
         sharded_store._update_internal_state()
+
+        return sharded_store
+
+    def map_shards(self, func: Callable[[zarr.storage.BaseStore, str, str], zarr.storage.BaseStore]):
+        """Run the provided function on each shard in the store.
+        
+        The function should take the store, shard path, and optional array chunk path as inputs and return a store as an output.
+        
+        Returns a new ShardedStore with the resulting output stores."""
+        base = func(self.base, '', None)
+        shards = {}
+        for path in self.shards:
+            shards[path] = func(self.shards[path], path, None)
+        array_shard_funcs = {}
+        for p, sf in self.array_shard_funcs:
+            array_shard_funcs[p] = (self.array_shard_dims[p], sf)
+        sharded_store = self.__class__(base, shards=shards, array_shard_funcs=array_shard_funcs, dimension_separator=self._dimension_separator)
+
+        array_shards = {}
+        array_shard_dims = {}
+        for array_shards_path in self.array_shards:
+            array_shards[array_shards_path] = {}
+            for array_shard_path in self.array_shards[array_shards_path]:
+                array_shard_dims[array_shards_path] = (len(array_shard_path) + 1) // 2
+                array_shard = func(self.array_shards[array_shards_path][array_shard_path], array_shards_path, array_shard_path)
+                array_shards[array_shards_path][array_shard_path] = array_shard
+        sharded_store.array_shards = array_shards
+        sharded_store.array_shard_dims = array_shard_dims
 
         return sharded_store
 
@@ -286,8 +334,11 @@ class ShardedStore(zarr.storage.Store):
                             array_meta.pop('zarr_format', None)
                             array_meta['compressor'] = codecs.registry.get_codec(array_meta['compressor'])
 
+                            prefix_separator = self._dimension_separator
+                            if not prefix_separator:
+                                prefix_separator = '/'
                             for chunk_shard in itertools.product(*(range(s) for s in chunk_shard_shape)):
-                                chunk_prefix = '/'.join([str(c) for c in chunk_shard])
+                                chunk_prefix = prefix_separator.join([str(c) for c in chunk_shard])
                                 array_shard = array_shard_func(chunk_prefix)
                                 if hasattr(array_shard, '_dimension_separator'):
                                     if array_shard._dimension_separator != self._dimension_separator:

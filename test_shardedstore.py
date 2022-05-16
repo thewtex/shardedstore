@@ -9,7 +9,7 @@ from datatree import DataTree
 import datatree
 import json
 
-from shardedstore import ShardedStore, array_shard_directory_store, array_shard_zip_store
+from shardedstore import ShardedStore, array_shard_directory_store, to_zip_store_with_prefix
 
 from zarr.storage import DirectoryStore
 
@@ -103,7 +103,6 @@ def test_datatree_shardedstore(dimension_separator):
         shard1 = DirectoryStore(os.path.join(folder, "shard1.zarr"), dimension_separator=dimension_separator)
         shard2 = DirectoryStore(os.path.join(folder, "shard2.zarr"), dimension_separator=dimension_separator)
         array_shards1 = array_shard_directory_store(os.path.join(folder, "array_shards1"), dimension_separator=dimension_separator)
-        # array_shards2 = array_shard_zip_store(os.path.join(folder, "array_shards2"), dimension_separator=dimension_separator)
         array_shards2 = array_shard_directory_store(os.path.join(folder, "array_shards2"), dimension_separator=dimension_separator)
 
         # xarray-datatree Quick Overview
@@ -126,7 +125,6 @@ def test_datatree_shardedstore(dimension_separator):
             {'simulation/coarse/foo': (1, array_shards1), 'simulation/fine/foo': (2, array_shards2)})
         dt.to_zarr(sharded_store)
 
-
         config = sharded_store.get_config()
         config_str = json.dumps(config)
         config = json.loads(config_str)
@@ -137,4 +135,12 @@ def test_datatree_shardedstore(dimension_separator):
 
         assert from_single.identical(from_sharded)
 
+        to_zip_stores = to_zip_store_with_prefix(os.path.join(folder, "zip_stores"))
+        zip_sharded_stores = sharded_store.map_shards(to_zip_stores)
+
+        # raises `ValueError: Attempt to use ZIP archive that was already closed` ?
+        # Requires: https://github.com/xarray-contrib/datatree/pull/90
+        # from_zip_sharded = datatree.open_datatree(zip_sharded_stores, engine='zarr', mode='r').compute()
+
+        zip_sharded_stores.close()
         sharded_store.close()
