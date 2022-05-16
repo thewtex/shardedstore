@@ -1,6 +1,6 @@
 """Provides a sharded Zarr store."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from typing import Any, Dict, Optional, Tuple, Callable
 from pathlib import PurePosixPath, Path
