@@ -8,7 +8,7 @@ Provides a sharded Zarr store.
 
 ## Features
 
-- For large Zarr stores, avoid an excessive number of objects or extremely large objects, which avoids filesystem inode usage and object store limitations.
+- For large Zarr stores, avoid an excessive number of objects or extremely large objects, which bypasses filesystem inode usage and object store limitations.
 - Performance-sensitive implementation.
 - Use existing Zarr v2 stores.
 - Mix and match shard store types.
