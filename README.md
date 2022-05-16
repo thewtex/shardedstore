@@ -58,7 +58,8 @@ dt = DataTree.from_dict({"simulation/coarse": ds, "simulation/fine": ds2, "/": d
 single_store = DirectoryStore("single.zarr")
 dt.to_zarr(single_store)
 
-# A sharded store demonstrating sharding on groups and arrays. The arrays are sharded over 1 dimension.
+# A sharded store demonstrating sharding on groups and arrays.
+# Arrays are sharded over 1 dimension.
 sharded_store = ShardedStore(base_store,
     {'people': shard1, 'species': shard2},
     {'simulation/coarse/foo': (1, array_shards1), 'simulation/fine/foo': (1, array_shards2)})
