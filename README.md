@@ -71,8 +71,8 @@ config_str = json.dumps(config)
 config = json.loads(config_str)
 sharded_store = ShardedStore.from_config(config)
 
-from_single = datatree.open_datatree(single_store, engine='zarr').compute()
-from_sharded = datatree.open_datatree(sharded_store, engine='zarr').compute()
+from_single = open_datatree(single_store, engine='zarr').compute()
+from_sharded = open_datatree(sharded_store, engine='zarr').compute()
 
 assert from_single.identical(from_sharded)
 
