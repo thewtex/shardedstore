@@ -1,4 +1,5 @@
 # shardedstore
+![sharded_store](https://user-images.githubusercontent.com/1222638/187794638-a3b75e3a-c9c1-4b59-a5ed-11c1a0e4faea.png)
 
 [![image](https://img.shields.io/pypi/v/shardedstore.svg)](https://pypi.python.org/pypi/shardedstore/)
 [![Test](https://github.com/thewtex/shardedstore/actions/workflows/test.yml/badge.svg)](https://github.com/thewtex/shardedstore/actions/workflows/test.yml)
